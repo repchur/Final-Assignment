@@ -1,0 +1,83 @@
+---
+title: "Final Assignment"
+author: "Ruth Repchuck"
+date: "January 20, 2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+For this assignment, I will be attempting to train a random forest model that will be used to predict the way participants are completing an exercise. There are five classes: A, B, C, D, and E that I will predict based on data collected using multiple accelerometer instruments from various areas of the body, including: 1) Belt; 2) Forearm; 3) Arm; and 4) Dumbell. 
+
+I have chosen a random forest model due to its great flexibility to perform well for many problems. There is a large number of variables (160) and objects (>19,000) in the data which is accomodated easily using a random forest. Even though a random forest is not easily interpretable, the main goal of this project is prediction, and therefore, the random forest's great predictive accuracy is the most desirable.
+
+I will begin by reading in the data. If you are evaluating this, please feel free to alter the code to reflect your own storage of the data:
+
+```{r}
+library(readr)
+training <- read.csv("S:/Users/repchur/Machine Learning Course/Week 4/pml-training.csv")
+testing <- read.csv("S:/Users/repchur/Machine Learning Course/Week 4/pml-testing.csv")
+```
+
+Next, I will make sure to load the required packages. For this assignment, I will use the randomForest package and the caret package:
+
+```{r}
+library(caret)
+library(randomForest)
+```
+
+The response variable for this project is a categorical variable. Therefore, I will need to convert it to a factor in the training set:
+
+```{r}
+training$classe.f <- as.factor(training$classe)
+```
+
+As I am unfamiliar with this dataset, it was difficult to determine what each variable actually entailed. Therefore, I decided that the best way forward was to utilize the columns with complete data (i.e., no missing values) and then examine variable importance in case any could be removed. I did not include any variables that were obviously unnecessary for prediction (e.g., timestamps). I begin by setting the seed, training the random forest model on the training data, and then examing the results:
+
+```{r}
+set.seed(1988)
+rftrain <- randomForest(classe.f ~ roll_belt+pitch_belt+yaw_belt+total_accel_belt+gyros_belt_x+gyros_belt_z+gyros_belt_y+accel_belt_x+accel_belt_y+accel_belt_z+magnet_belt_x+magnet_belt_y+magnet_belt_z+roll_arm+pitch_arm+yaw_arm+total_accel_arm+gyros_arm_x+gyros_arm_y+gyros_arm_z+accel_arm_x+accel_arm_y+accel_arm_z+magnet_arm_x+magnet_arm_y+magnet_arm_z+roll_dumbbell+pitch_dumbbell+yaw_dumbbell+total_accel_dumbbell+gyros_dumbbell_x+gyros_dumbbell_y+gyros_dumbbell_z+accel_dumbbell_x+accel_dumbbell_y+accel_dumbbell_z+magnet_dumbbell_x+magnet_dumbbell_y+magnet_dumbbell_z+roll_forearm+pitch_forearm+yaw_forearm+total_accel_forearm+gyros_forearm_x+gyros_forearm_y+gyros_forearm_z+accel_forearm_x+accel_forearm_y+accel_forearm_z+magnet_forearm_x+magnet_forearm_y+magnet_forearm_z, data=training)
+rftrain
+```
+
+The results estimate a 0.26% out-of-bag error rate which is highly accurate. Further examination of the matrix and errors shows highly accurate predictions in the test data using the random forest algorithm with these predictor variables. Next, I will examine variable importance in case it suggests that any of the variables included in the model are not important for prediction in this model:
+
+```{r}
+varImp(rftrain)
+```
+
+Upon examination of the results, I can see that the lowest % increase in OOB error rate is around 55. Therefore, I chose to retain all predictor variables in the model.
+
+Next, I turn my attention to tuning the model. Random forest tuning requires adjusting the number of predictors considered by the model at each split. I chose to try, in addition to the default 7, 3, 9, 11, and 14. I will use repeated 10-fold cross validation to ensure correct tuning parameters:
+
+```{r}
+ctrl <- trainControl(method="repeatedcv", number=10, repeats=10)
+rfgrid <- expand.grid(.mtry=c(3, 7, 9, 11, 14))
+```
+
+Next, I will run the model with the specified tuning parameters and ask that it returns the Kappa metric so that I can evaluate which number is most likely to return the best prediction. This code chunk will take time to run and I suggest not running this unless you really want to!
+
+```{r}
+m_rf <- train(classe.f ~ roll_belt+pitch_belt+yaw_belt+total_accel_belt+gyros_belt_x+gyros_belt_z+gyros_belt_y+accel_belt_x+accel_belt_y+accel_belt_z+magnet_belt_x+magnet_belt_y+magnet_belt_z+roll_arm+pitch_arm+yaw_arm+total_accel_arm+gyros_arm_x+gyros_arm_y+gyros_arm_z+accel_arm_x+accel_arm_y+accel_arm_z+magnet_arm_x+magnet_arm_y+magnet_arm_z+roll_dumbbell+pitch_dumbbell+yaw_dumbbell+total_accel_dumbbell+gyros_dumbbell_x+gyros_dumbbell_y+gyros_dumbbell_z+accel_dumbbell_x+accel_dumbbell_y+accel_dumbbell_z+magnet_dumbbell_x+magnet_dumbbell_y+magnet_dumbbell_z+roll_forearm+pitch_forearm+yaw_forearm+total_accel_forearm+gyros_forearm_x+gyros_forearm_y+gyros_forearm_z+accel_forearm_x+accel_forearm_y+accel_forearm_z+magnet_forearm_x+magnet_forearm_y+magnet_forearm_z, data=training, method="rf", metric="Kappa", trControl=ctrl, tuneGrid=rfgrid)
+m_rf
+```
+
+The highest Kappa suggests that considering 9 predictor variables at each split will give the best result. Here is the final training model I will utilize for predicting the 20 cases in the test set:
+
+```{r}
+rftrainfinal <- randomForest(classe.f ~ roll_belt+pitch_belt+yaw_belt+total_accel_belt+gyros_belt_x+gyros_belt_z+gyros_belt_y+accel_belt_x+accel_belt_y+accel_belt_z+magnet_belt_x+magnet_belt_y+magnet_belt_z+roll_arm+pitch_arm+yaw_arm+total_accel_arm+gyros_arm_x+gyros_arm_y+gyros_arm_z+accel_arm_x+accel_arm_y+accel_arm_z+magnet_arm_x+magnet_arm_y+magnet_arm_z+roll_dumbbell+pitch_dumbbell+yaw_dumbbell+total_accel_dumbbell+gyros_dumbbell_x+gyros_dumbbell_y+gyros_dumbbell_z+accel_dumbbell_x+accel_dumbbell_y+accel_dumbbell_z+magnet_dumbbell_x+magnet_dumbbell_y+magnet_dumbbell_z+roll_forearm+pitch_forearm+yaw_forearm+total_accel_forearm+gyros_forearm_x+gyros_forearm_y+gyros_forearm_z+accel_forearm_x+accel_forearm_y+accel_forearm_z+magnet_forearm_x+magnet_forearm_y+magnet_forearm_z, data=training, mtry=9)
+rftrainfinal
+```
+
+It is still highly accurate with an estimated OOB error of 0.27%. Finally, I will preict the outcome on the 20 cases in the test set:
+
+```{r}
+pred <- predict(rftrainfinal, testing)
+pred
+```
+
+My result on the final quiz was 100%! My random forest model predicted the outcome accurately in the test set 100% of the time :)
+
+Thank you for reading!
